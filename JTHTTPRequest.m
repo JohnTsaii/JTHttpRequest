@@ -1,99 +1,46 @@
 //
-//  JTHTTPRequest.m
-//  a simple httprequest manager base on AFNetWorking
+//  JTHTTPManager.m
+//  JTHTTPManager
 //
-//  Created by John Tsai on 14/12/15.
-//  Copyright (c) 2014年 John Tsai. All rights reserved.
+//  Created by John Tsai on 15/4/2.
+//  Copyright (c) 2015年 John TSai. All rights reserved.
 //
 
-#import "JTHTTPRequest.h"
+#import "JTHTTPManager.h"
 
-static JTHTTPRequest *request = nil;
-
-// http://h1.autoepp.com 正式环境接口
-#if DebugMode
-NSString const*const JTRequestBASEURL = @"the base url for you appliction debugmode";
+#if DEBUG
+static NSString *BASEURL = @"you debug mode base url";
 #else
-NSString const*const JTRequestBASEURL = @"the base url for you appliction releasemode";
-
+static NSString *BASEURL = @"you release mode base url";
 #endif
 
-@implementation JTHTTPRequest
+@implementation JTHTTPManager
 
-- (instancetype)init
-{
-    self = [super init];
-    if (self) {
-        _httpManager = [self createOperationManager];
-        
-        if (request == nil) {
-            request = self;
-        }
-    }
-    return self;
-}
-
-+ (instancetype)sharedManager
-{
-    return request;
-}
-
-+ (void)setSharedManager:(JTHTTPRequest *)newRequest
-{
-    request = newRequest;
-}
-
-#pragma mark -
-#pragma mark SetHTTPClient
-/**
- *  shareHTTPClient
- *
- *  @return 共享一个client
- */
-- (AFHTTPRequestOperationManager *)createOperationManager
-{
-    AFHTTPRequestOperationManager *manager = [[AFHTTPRequestOperationManager alloc] initWithBaseURL:[NSURL URLWithString:JTRequestBASEURL]];
-    // 设置url数据请求报头
-    manager.requestSerializer = [AFJSONRequestSerializer serializer];
-    manager.responseSerializer = [AFHTTPResponseSerializer serializer];
+// share the global manager
++ (instancetype)sharedManager {
+    static dispatch_once_t onceToken;
+    static JTHTTPManager *manager = nil;
+    dispatch_once(&onceToken, ^{
+        manager = [[self alloc] initWithBaseURL:[NSURL URLWithString:BASEURL]];
+        manager.requestSerializer = [AFJSONRequestSerializer serializer];
+        manager.responseSerializer = [AFHTTPResponseSerializer serializer];
+        manager.completionQueue = create_queue();
+    });
     return manager;
 }
 
-- (void)setDefaultHeader:(NSString *)header
-                   value:(NSString *)value
-{
-    [_httpManager.requestSerializer setValue:value forHTTPHeaderField:header];
+// crate unique queue
+dispatch_queue_t create_queue() {
+    static dispatch_queue_t queue = nil;
+    if (!queue) {
+        queue = dispatch_queue_create("com.myapp.newWorkingQueue", NULL);
+    }
+    return queue;
 }
 
-#pragma mark -
-#pragma mark ParseData
-+ (void)parseDataToResponseDictionaryWithData:(id)data complete:(void (^) (NSDictionary *response, NSNumber *status))block;
-{
-    if (data) {
-        NSDictionary *dict = [data objectFromJSONData];
-        NSNumber *status  = [dict objectForKey:@"status"];
-        NSDictionary *response = [dict objectForKey:@"data"];
-        if (block) {
-            block(response, status);
-        }
-    } else {
-        NSLog(@"parse data failed because the data is nil");
-    }
-    
-}
-
-+ (void)parseDataToResponseArrayWithData:(id)data complete:(void (^) (NSDictionary *response, NSNumber *status))block;
-{
-    if (data) {
-        NSDictionary *dict = [data objectFromJSONData];
-        NSNumber *status  = [dict objectForKey:@"status"];
-        NSDictionary *response = dict;
-        if (block) {
-            block(response, status);
-        }
-    } else {
-        NSLog(@"parse data failed because the data is nil");
-    }
+// get the global unique queue
+- (dispatch_queue_t)getNetWotkingQueue {
+    return create_queue();
 }
 
 @end
